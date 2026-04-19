@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>รับเรื่องร้องเรียน รพ.สต. ซำป่ารัง</title>
+    <!-- Google Fonts: Sarabun -->
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Sarabun', 'sans-serif'] },
+                    colors: {
+                        pastel: {
+                            blue: '#A7C7E7',
+                            dark: '#6B90B5',
+                            light: '#E6F0FA',
+                            bg: '#F5F9FD',
+                            admin: '#2C3E50'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Sarabun', sans-serif; background-color: #F5F9FD; }
+        
+        /* Chat Scrollbar */
+        .chat-scroll::-webkit-scrollbar { width: 6px; }
+        .chat-scroll::-webkit-scrollbar-track { background: transparent; }
+        .chat-scroll::-webkit-scrollbar-thumb { background: #A7C7E7; border-radius: 10px; }
+        
+        /* Animations */
+        .fade-in { animation: fadeIn 0.3s ease-in-out; }
+        .slide-up { animation: slideUp 0.3s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Chat Bubbles */
+        .bubble-bot { background: white; border: 1px solid #E6F0FA; border-radius: 1rem 1rem 1rem 0; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .bubble-user { background: #A7C7E7; color: #1e3a8a; border-radius: 1rem 1rem 0 1rem; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        
+        /* Loader */
+        .typing-dot { animation: typing 1.4s infinite ease-in-out both; }
+        .typing-dot:nth-child(1) { animation-delay: -0.32s; }
+        .typing-dot:nth-child(2) { animation-delay: -0.16s; }
+        @keyframes typing { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1); } }
+    </style>
+</head>
+<body class="h-screen flex flex-col text-gray-800">
+
+    <!-- Header -->
+    <header class="bg-white shadow-sm p-4 flex justify-between items-center z-10 relative">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 bg-pastel-blue text-white rounded-full flex items-center justify-center text-xl shadow">
+                <i class="fa-solid fa-hospital"></i>
+            </div>
+            <div>
+                <h1 class="font-bold text-lg leading-tight text-gray-800">ศูนย์รับเรื่องร้องเรียน</h1>
+                <p class="text-xs text-gray-500">รพ.สต. ซำป่ารัง อ.กู่แก้ว จ.อุดรธานี</p>
+            </div>
+        </div>
+        <div>
+            <button onclick="toggleView()" id="toggleViewBtn" class="text-pastel-dark hover:text-blue-800 text-sm font-medium transition">
+                <i class="fa-solid fa-lock mr-1"></i> ผู้ดูแลระบบ
+            </button>
+        </div>
+    </header>
+
+    <!-- ==================== VIEW 1: CHATBOT UI ==================== -->
+    <main id="chatbot-view" class="flex-1 flex flex-col overflow-hidden w-full max-w-2xl mx-auto bg-pastel-bg shadow-lg border-x border-pastel-light relative">
+        
+        <!-- Chat Area -->
+        <div id="chat-box" class="flex-1 overflow-y-auto p-4 space-y-4 chat-scroll pb-24">
+            <!-- Messages will be injected here via JS -->
+        </div>
+
+        <!-- Input Area (Fixed at bottom) -->
+        <div id="input-area" class="bg-white p-3 border-t border-pastel-light absolute bottom-0 left-0 right-0 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] fade-in">
+            <!-- Dynamic Input UI will be injected here -->
+        </div>
+
+        <!-- Loading Overlay (For Submit) -->
+        <div id="loading-overlay" class="hidden absolute inset-0 bg-white/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-pastel-dark mb-4"></div>
+            <p class="text-pastel-dark font-medium animate-pulse">กำลังบันทึกข้อมูลและอัปโหลดไฟล์...</p>
+        </div>
+    </main>
+
+    <!-- ==================== VIEW 2: ADMIN LOGIN & DASHBOARD ==================== -->
+    <main id="admin-view" class="hidden flex-1 overflow-y-auto bg-gray-50 w-full pb-10">
+        
+        <!-- Admin Login -->
+        <div id="admin-login-box" class="max-w-md mx-auto mt-20 p-8 bg-white rounded-xl shadow-lg fade-in">
+            <div class="text-center mb-6">
+                <i class="fa-solid fa-shield-halved text-4xl text-pastel-admin mb-3"></i>
+                <h2 class="text-2xl font-bold text-gray-800">เข้าสู่ระบบผู้ดูแล</h2>
+            </div>
+            <input type="password" id="admin-pwd" placeholder="รหัสผ่าน (admin/1234)" class="w-full p-3 border rounded-lg mb-4 focus:ring-2 focus:ring-pastel-admin outline-none text-center text-lg">
+            <button onclick="loginAdmin()" class="w-full bg-pastel-admin text-white py-3 rounded-lg font-bold hover:bg-gray-800 transition shadow">เข้าสู่ระบบ</button>
+            <p id="login-error" class="text-red-500 text-center mt-3 text-sm hidden">รหัสผ่านไม่ถูกต้อง</p>
+        </div>
+
+        <!-- Admin Dashboard -->
+        <div id="admin-dashboard-box" class="hidden max-w-6xl mx-auto mt-6 p-4 fade-in">
+            <div class="flex justify-between items-center mb-6 flex-wrap gap-4">
+                <h2 class="text-2xl font-bold text-gray-800"><i class="fa-solid fa-chart-line mr-2"></i> สถิติภาพรวม</h2>
+                <button onclick="loadDashboardData()" class="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-50 shadow-sm text-sm">
+                    <i class="fa-solid fa-rotate-right mr-1"></i> รีเฟรชข้อมูล
+                </button>
+            </div>
+
+            <!-- Stats Cards -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-blue-500">
+                    <p class="text-sm text-gray-500 mb-1">ทั้งหมด (เรื่อง)</p>
+                    <h3 class="text-3xl font-bold text-gray-800" id="stat-total">-</h3>
+                </div>
+                <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-green-500">
+                    <p class="text-sm text-gray-500 mb-1">วันนี้ (เรื่อง)</p>
+                    <h3 class="text-3xl font-bold text-gray-800" id="stat-today">-</h3>
+                </div>
+                <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-purple-500">
+                    <p class="text-sm text-gray-500 mb-1">7 วันล่าสุด</p>
+                    <h3 class="text-3xl font-bold text-gray-800" id="stat-7days">-</h3>
+                </div>
+                <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-yellow-500 flex flex-col justify-center">
+                    <p class="text-xs text-gray-500 mb-1">ให้เบอร์ติดต่อ</p>
+                    <div class="flex items-center gap-2">
+                        <span class="text-xl font-bold text-green-600" id="stat-has-phone">-</span>
+                        <span class="text-xs text-gray-400">vs</span>
+                        <span class="text-xl font-bold text-gray-400" id="stat-no-phone">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts Row -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                <div class="bg-white p-4 rounded-xl shadow-sm">
+                    <h3 class="text-md font-bold text-gray-700 mb-4">แนวโน้มรายวัน (30 วันล่าสุด)</h3>
+                    <div class="h-64"><canvas id="lineChart"></canvas></div>
+                </div>
+                <div class="bg-white p-4 rounded-xl shadow-sm">
+                    <h3 class="text-md font-bold text-gray-700 mb-4">หมวดหมู่เรื่องร้องเรียน</h3>
+                    <div class="h-64"><canvas id="barChart"></canvas></div>
+                </div>
+            </div>
+
+            <!-- Bottom Row: Keywords & Table -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Keywords -->
+                <div class="bg-white p-4 rounded-xl shadow-sm col-span-1">
+                    <h3 class="text-md font-bold text-gray-700 mb-4">คำยอดฮิต (Top Keywords)</h3>
+                    <div class="overflow-y-auto h-80 chat-scroll">
+                        <table class="w-full text-sm text-left">
+                            <thead class="bg-gray-50 text-gray-600"><tr><th class="py-2 px-3">คำ</th><th class="py-2 px-3 text-right">จำนวน</th></tr></thead>
+                            <tbody id="keywords-tbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Latest Complaints -->
+                <div class="bg-white p-4 rounded-xl shadow-sm col-span-1 lg:col-span-2">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-md font-bold text-gray-700">รายการล่าสุด (20 รายการ)</h3>
+                        <div class="flex gap-2">
+                            <select id="filter-status" onchange="renderTable()" class="border p-1 text-sm rounded">
+                                <option value="all">ทุกสถานะ</option>
+                                <option value="new">รับเรื่องใหม่</option>
+                                <option value="in_progress">กำลังดำเนินการ</option>
+                                <option value="closed">ปิดงาน</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left whitespace-nowrap">
+                            <thead class="bg-gray-50 text-gray-600 border-b">
+                                <tr>
+                                    <th class="py-3 px-4">ID / วันที่</th>
+                                    <th class="py-3 px-4">หมวดหมู่</th>
+                                    <th class="py-3 px-4">ผู้ร้องเรียน</th>
+                                    <th class="py-3 px-4">สถานะ</th>
+                                    <th class="py-3 px-4 text-center">จัดการ</th>
+                                </tr>
+                            </thead>
+                            <tbody id="complaints-tbody" class="divide-y">
+                                <!-- Table rows -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal for Admin Detail/Edit -->
+    <div id="admin-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 fade-in">
+        <div class="bg-white w-full max-w-2xl rounded-xl shadow-2xl flex flex-col max-h-[90vh]">
+            <div class="p-4 border-b flex justify-between items-center bg-pastel-admin text-white rounded-t-xl">
+                <h3 class="font-bold text-lg" id="modal-id">รายละเอียด</h3>
+                <button onclick="closeModal()" class="text-white/80 hover:text-white"><i class="fa-solid fa-times text-xl"></i></button>
+            </div>
+            <div class="p-6 overflow-y-auto flex-1 text-sm space-y-4">
+                <div class="grid grid-cols-2 gap-4">
+                    <div><span class="text-gray-500">วันที่แจ้ง:</span> <span id="m-time" class="font-medium block"></span></div>
+                    <div><span class="text-gray-500">หมวดหมู่:</span> <span id="m-cat" class="font-medium text-blue-600 block"></span></div>
+                    <div><span class="text-gray-500">ผู้แจ้ง:</span> <span id="m-name" class="font-medium block"></span></div>
+                    <div><span class="text-gray-500">เบอร์โทร:</span> <span id="m-phone" class="font-medium block"></span></div>
+                    <div class="col-span-2"><span class="text-gray-500">เพิ่มเติม (เวลา/สถานที่):</span> <span id="m-extra" class="block bg-gray-50 p-2 rounded mt-1"></span></div>
+                </div>
+                
+                <div>
+                    <span class="text-gray-500 font-bold">รายละเอียดเรื่องร้องเรียน:</span>
+                    <p id="m-details" class="p-3 bg-red-50 border border-red-100 rounded mt-1 whitespace-pre-wrap"></p>
+                </div>
+                
+                <div id="m-images-container" class="hidden">
+                    <span class="text-gray-500 font-bold mb-2 block">รูปภาพแนบ:</span>
+                    <div id="m-images" class="flex gap-2 flex-wrap"></div>
+                </div>
+
+                <hr>
+                
+                <div class="bg-blue-50 p-4 rounded-lg border border-blue-100">
+                    <h4 class="font-bold text-pastel-admin mb-2"><i class="fa-solid fa-pen-to-square"></i> การจัดการโดยเจ้าหน้าที่</h4>
+                    <label class="block text-xs text-gray-500 mb-1">สถานะปัจจุบัน</label>
+                    <select id="m-status-input" class="w-full p-2 border rounded mb-3 bg-white">
+                        <option value="new">🔴 รับเรื่องใหม่</option>
+                        <option value="in_progress">🟡 กำลังดำเนินการ</option>
+                        <option value="closed">🟢 ปิดงาน / ดำเนินการเสร็จสิ้น</option>
+                    </select>
+                    
+                    <label class="block text-xs text-gray-500 mb-1">บันทึกของผู้ดูแล (Admin Note)</label>
+                    <textarea id="m-note-input" rows="2" class="w-full p-2 border rounded bg-white" placeholder="พิมพ์บันทึกการทำงาน..."></textarea>
+                </div>
+            </div>
+            <div class="p-4 border-t flex justify-end gap-2 bg-gray-50 rounded-b-xl">
+                <button onclick="closeModal()" class="px-4 py-2 text-gray-600 hover:bg-gray-200 rounded">ปิด</button>
+                <button onclick="saveAdminUpdate()" class="px-4 py-2 bg-pastel-admin text-white rounded hover:bg-gray-800 shadow">บันทึกการแก้ไข</button>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- ==================== JAVASCRIPT ==================== -->
+    <script>
+        // --- 1. CHATBOT DATA & CONFIG ---
+        const CATEGORIES = [
+            "การให้บริการ/มารยาท/การสื่อสาร", "ระยะเวลารอคอย", "ความสะอาด/สภาพแวดล้อม",
+            "การเข้าถึงบริการ/ความสะดวก", "เวชภัณฑ์/ยา/การรับยา", "การนัดหมาย/ระบบคิว",
+            "ค่าใช้จ่าย/สิทธิการรักษา", "ความปลอดภัย/อุบัติการณ์", "ข้อเสนอแนะเพื่อพัฒนาบริการ", "อื่น ๆ (ระบุเอง)"
+        ];
+
+        let state = 'WELCOME';
+        let formData = { name: '', phone: '', category: '', extraQ: '', details: '', images: [] };
+        const chatBox = document.getElementById('chat-box');
+        const inputArea = document.getElementById('input-area');
+
+        // --- 2. CHATBOT CORE LOGIC ---
+        
+        // เริ่มต้น Chatbot
+        window.onload = () => { setTimeout(initChat, 500); };
+
+        function initChat() {
+            chatBox.innerHTML = '';
+            formData = { name: '', phone: '', category: '', extraQ: '', details: '', images: [] };
+            state = 'WELCOME';
+            
+            addBotMessage("สวัสดีครับ 🙏 ศูนย์รับเรื่องร้องเรียน รพ.สต. ซำป่ารัง ยินดีให้บริการครับ", false);
+            setTimeout(() => {
+                addBotMessage(`<b><i class="fa-solid fa-shield-halved text-blue-500"></i> นโยบายความเป็นส่วนตัว (PDPA)</b><br>
+                ข้อมูลของท่านจะถูกเก็บเป็นความลับ และใช้เพื่อการติดตามแก้ไขปัญหาพัฒนาบริการของโรงพยาบาลเท่านั้น<br><br>
+                ท่านต้องการแจ้งเรื่องร้องเรียน/เสนอแนะ ใช่หรือไม่?`, true);
+                
+                renderInputUI('WELCOME');
+            }, 800);
+        }
+
+        // เพิ่มข้อความบอท
+        function addBotMessage(html, isHTML = false) {
+            const div = document.createElement('div');
+            div.className = 'flex items-start gap-2 max-w-[85%] slide-up';
+            div.innerHTML = `
+                <div class="w-8 h-8 rounded-full bg-pastel-dark flex-shrink-0 flex items-center justify-center text-white text-xs mt-1 shadow-sm">
+                    <i class="fa-solid fa-robot"></i>
+                </div>
+                <div class="bubble-bot p-3 text-sm text-gray-700">
+                    ${isHTML ? html : escapeHTML(html)}
+                </div>
+            `;
+            chatBox.appendChild(div);
+            scrollToBottom();
+        }
+
+        // เพิ่มข้อความผู้ใช้
+        function addUserMessage(text) {
+            const div = document.createElement('div');
+            div.className = 'flex items-start gap-2 max-w-[85%] ml-auto flex-row-reverse slide-up';
+            div.innerHTML = `
+                <div class="bubble-user p-3 text-sm font-medium">
+                    ${escapeHTML(text)}
+                </div>
+            `;
+            chatBox.appendChild(div);
+            scrollToBottom();
+        }
+
+        function scrollToBottom() {
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        function escapeHTML(str) {
+            return str.replace(/[&<>'"]/g, tag => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+            }[tag]));
+        }
+
+        function showTypingIndicator() {
+            inputArea.innerHTML = ''; // Clear input while bot types
+            const div = document.createElement('div');
+            div.id = 'typing-indicator';
+            div.className = 'flex items-center gap-1 max-w-[85%] slide-up ml-10 mb-2';
+            div.innerHTML = `
+                <div class="bubble-bot p-3 py-4 flex gap-1 items-center">
+                    <div class="w-2 h-2 bg-pastel-dark rounded-full typing-dot"></div>
+                    <div class="w-2 h-2 bg-pastel-dark rounded-full typing-dot"></div>
+                    <div class="w-2 h-2 bg-pastel-dark rounded-full typing-dot"></div>
+                </div>
+            `;
+            chatBox.appendChild(div);
+            scrollToBottom();
+        }
+
+        function removeTypingIndicator() {
+            const indicator = document.getElementById('typing-indicator');
+            if (indicator) indicator.remove();
+        }
+
+        // จัดการ State และสร้าง UI Input
+        function renderInputUI(currentState) {
+            inputArea.innerHTML = '';
+            
+            if (currentState === 'WELCOME') {
+                inputArea.innerHTML = `
+                    <div class="flex gap-2 justify-center">
+                        <button onclick="handleUserChoice('YES_START')" class="bg-pastel-dark text-white px-6 py-2.5 rounded-full font-medium hover:bg-blue-700 transition shadow w-full">เริ่มกรอกข้อมูล</button>
+                    </div>`;
+            } 
+            else if (currentState === 'NAME') {
+                inputArea.innerHTML = `
+                    <div class="flex gap-2">
+                        <input type="text" id="input-name" placeholder="ระบุ ชื่อ-นามสกุล (จำเป็น)" class="flex-1 border p-3 rounded-full bg-gray-50 focus:ring-2 focus:ring-pastel-dark outline-none text-sm">
+                        <button onclick="processInput('NAME')" class="bg-pastel-dark text-white w-12 h-12 rounded-full flex items-center justify-center hover:bg-blue-700 transition shadow"><i class="fa-solid fa-paper-plane"></i></button>
+                    </div>`;
+                document.getElementById('input-name').focus();
+            }
+            else if (currentState === 'PHONE') {
+                inputArea.innerHTML = `
+                    <div class="flex flex-col gap-2">
+                        <div class="flex gap-2">
+                            <input type="tel" id="input-phone" placeholder="เบอร์โทรศัพท์ 9-10 หลัก (ถ้ามี)" maxlength="10" class="flex-1 border p-3 rounded-full bg-gray-50 focus:ring-2 focus:ring-pastel-dark outline-none text-sm">
+                            <button onclick="processInput('PHONE')" class="bg-pastel-dark text-white px-4 rounded-full flex items-center justify-center hover:bg-blue-700 transition shadow text-sm whitespace-nowrap">ส่ง</button>
+                        </div>
+                        <button onclick="processInput('PHONE_SKIP')" class="text-gray-400 text-xs hover:text-gray-600 underline text-center w-full py-1">ไม่ต้องการระบุเบอร์โทร</button>
+                    </div>`;
+                document.getElementById('input-phone').focus();
+            }
+            else if (currentState === 'CATEGORY') {
+                let html = '<div class="flex overflow-x-auto gap-2 pb-2 chat-scroll">';
+                CATEGORIES.forEach(cat => {
+                    html += `<button onclick="handleUserChoice('CAT', '${cat}')" class="whitespace-nowrap bg-white border border-pastel-dark text-pastel-dark px-4 py-2 rounded-full text-sm hover:bg-pastel-light transition">${cat}</button>`;
+                });
+                html += '</div>';
+                inputArea.innerHTML = html;
+            }
+            else if (currentState === 'OTHER_CAT') {
+                 inputArea.innerHTML = `
+                    <div class="flex gap-2">
+                        <input type="text" id="input-other-cat" placeholder="ระบุหมวดหมู่ที่ต้องการ..." class="flex-1 border p-3 rounded-full bg-gray-50 focus:ring-2 focus:ring-pastel-dark outline-none text-sm">
+                        <button onclick="processInput('OTHER_CAT')" class="bg-pastel-dark text-white px-4 rounded-full flex items-center justify-center hover:bg-blue-700 transition shadow">ส่ง</button>
+                    </div>`;
+            }
+            else if (currentState === 'EXTRA_Q') {
+                 inputArea.innerHTML = `
+                    <div class="flex gap-2">
+                        <input type="text" id="input-extra" placeholder="เช่น วันที่, เวลา, สถานที่ (สั้นๆ)" class="flex-1 border p-3 rounded-full bg-gray-50 focus:ring-2 focus:ring-pastel-dark outline-none text-sm">
+                        <button onclick="processInput('EXTRA_Q')" class="bg-pastel-dark text-white px-4 rounded-full flex items-center justify-center hover:bg-blue-700 transition shadow text-sm">ส่ง</button>
+                    </div>
+                     <button onclick="processInput('EXTRA_SKIP')" class="text-gray-400 text-xs hover:text-gray-600 underline text-center w-full py-2 mt-1">ข้ามส่วนนี้</button>
+                    `;
+            }
+            else if (currentState === 'DETAILS') {
+                inputArea.innerHTML = `
+                    <div class="flex flex-col gap-2">
+                        <textarea id="input-details" rows="3" placeholder="เล่าเหตุการณ์หรือสิ่งที่ต้องการร้องเรียน/เสนอแนะ..." oninput="updateCharCount()" class="w-full border p-3 rounded-xl bg-gray-50 focus:ring-2 focus:ring-pastel-dark outline-none text-sm resize-none"></textarea>
+                        <div class="flex justify-between items-center px-1">
+                            <span id="char-count" class="text-xs text-red-400">0/1000 (ขั้นต่ำ 20 ตัวอักษร)</span>
+                            <button onclick="processInput('DETAILS')" id="btn-details" disabled class="bg-gray-300 text-white px-6 py-2 rounded-full text-sm font-medium transition shadow">ส่งข้อมูล</button>
+                        </div>
+                    </div>`;
+                document.getElementById('input-details').focus();
+            }
+            else if (currentState === 'IMAGES') {
+                 inputArea.innerHTML = `
+                    <div class="flex flex-col gap-2">
+                        <div class="flex items-center gap-2">
+                            <label for="input-images" class="flex-1 border-2 border-dashed border-pastel-dark text-pastel-dark p-3 rounded-xl text-center cursor-pointer hover:bg-pastel-light transition text-sm flex flex-col items-center">
+                                <i class="fa-regular fa-image text-xl mb-1"></i>
+                                <span id="file-label">เลือกรูปภาพ (สูงสุด 3 รูป)</span>
+                            </label>
+                            <input type="file" id="input-images" multiple accept="image/jpeg, image/png" onchange="handleFileSelect(event)" class="hidden">
+                        </div>
+                        <div id="image-preview" class="flex gap-2 overflow-x-auto h-16 hidden"></div>
+                        <div class="flex gap-2 mt-1">
+                            <button onclick="processInput('IMAGE_SKIP')" class="flex-1 border border-gray-300 text-gray-600 py-2 rounded-full text-sm hover:bg-gray-50">ไม่แนบรูป</button>
+                            <button onclick="processInput('IMAGE_SUBMIT')" id="btn-img-submit" class="flex-1 bg-pastel-dark text-white py-2 rounded-full text-sm shadow hover:bg-blue-700 hidden">ส่งรูปภาพ</button>
+                        </div>
+                    </div>`;
+            }
+            else if (currentState === 'CONFIRM') {
+                inputArea.innerHTML = `
+                    <div class="flex flex-col gap-2 p-1">
+                        <button onclick="submitToGoogleSheet()" class="w-full bg-green-500 text-white py-3 rounded-xl font-bold shadow hover:bg-green-600 transition flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-paper-plane"></i> ยืนยันส่งเรื่องร้องเรียน
+                        </button>
+                        <div class="flex gap-2">
+                             <button onclick="initChat()" class="flex-1 bg-red-100 text-red-600 py-2 rounded-xl text-sm font-medium hover:bg-red-200 transition">เริ่มใหม่</button>
+                        </div>
+                    </div>`;
+            }
+            else if (currentState === 'SUCCESS') {
+                inputArea.innerHTML = `
+                    <button onclick="initChat()" class="w-full bg-pastel-dark text-white py-3 rounded-xl font-medium shadow hover:bg-blue-700 transition">
+                        กลับหน้าหลัก / แจ้งเรื่องใหม่
+                    </button>`;
+            }
+        }
+
+        // อัปเดตตัวนับอักษร
+        function updateCharCount() {
+            const text = document.getElementById('input-details').value;
+            const countLabel = document.getElementById('char-count');
+            const btn = document.getElementById('btn-details');
+            const len = text.length;
+            
+            countLabel.textContent = `${len}/1000`;
+            if (len >= 20 && len <= 1000) {
+                countLabel.className = 'text-xs text-green-500';
+                btn.disabled = false;
+                btn.className = 'bg-pastel-dark text-white px-6 py-2 rounded-full text-sm font-medium transition shadow hover:bg-blue-700';
+            } else {
+                countLabel.className = 'text-xs text-red-400';
+                btn.disabled = true;
+                btn.className = 'bg-gray-300 text-white px-6 py-2 rounded-full text-sm font-medium transition shadow';
+            }
+        }
+
+        // จัดการอัปโหลดไฟล์รูปลงตัวแปร
+        function handleFileSelect(event) {
+            const files = event.target.files;
+            const preview = document.getElementById('image-preview');
+            const label = document.getElementById('file-label');
+            const btnSubmit = document.getElementById('btn-img-submit');
+            
+            if (files.length > 3) {
+                alert("กรุณาเลือกไม่เกิน 3 รูปครับ");
+                event.target.value = "";
+                return;
+            }
+
+            formData.images = [];
+            preview.innerHTML = '';
+            
+            if (files.length > 0) {
+                preview.classList.remove('hidden');
+                btnSubmit.classList.remove('hidden');
+                label.textContent = `เลือกแล้ว ${files.length} รูป (เปลี่ยนได้)`;
+                
+                Array.from(files).forEach(file => {
+                    // Check size (max 3MB per file for GAS performance)
+                    if(file.size > 3 * 1024 * 1024){
+                        alert(`รูป ${file.name} ขนาดใหญ่เกินไป (จำกัด 3MB)`);
+                        return;
+                    }
+                    
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        // Show preview
+                        const img = document.createElement('img');
+                        img.src = e.target.result;
+                        img.className = 'h-full object-cover rounded border';
+                        preview.appendChild(img);
+                        
+                        // Prepare for GAS (Base64 without data URI scheme)
+                        const base64Data = e.target.result.split(",")[1];
+                        const ext = file.name.split('.').pop();
+                        formData.images.push({
+                            base64: base64Data,
+                            mimeType: file.type,
+                            ext: ext
+                        });
+                    };
+                    reader.readAsDataURL(file);
+                });
+            } else {
+                preview.classList.add('hidden');
+                btnSubmit.classList.add('hidden');
+                label.textContent = "เลือกรูปภาพ (สูงสุด 3 รูป)";
+            }
+        }
+
+        // จัดการ Action จากปุ่ม
+        function handleUserChoice(action, payload) {
+            if (action === 'YES_START') {
+                addUserMessage("ต้องการแจ้งเรื่องร้องเรียน");
+                state = 'NAME';
+                advanceFlow("ก่อนอื่น ขอทราบ <b>ชื่อ-นามสกุล</b> ของท่านครับ (จำเป็นต้องระบุ)");
+            }
+            else if (action === 'CAT') {
+                formData.category = payload;
+                addUserMessage(payload);
+                if (payload === "อื่น ๆ (ระบุเอง)") {
+                    state = 'OTHER_CAT';
+                    advanceFlow("โปรดระบุหมวดหมู่ที่ต้องการสั้นๆ ครับ");
+                } else {
+                    state = 'EXTRA_Q';
+                    advanceFlow(`หมวด ${payload} <br>รบกวนระบุ วันที่, เวลา หรือสถานที่เกิดเหตุ (ถ้ามี) แบบสั้นๆ ครับ เพื่อความรวดเร็วในการตรวจสอบ`);
+                }
+            }
+        }
+
+        // จัดการ Input Text/Submit
+        function processInput(inputType) {
+            if (inputType === 'NAME') {
+                const val = document.getElementById('input-name').value.trim();
+                if (!val) { alert("กรุณาระบุชื่อ-นามสกุลครับ"); return; }
+                formData.name = val;
+                addUserMessage(val);
+                state = 'PHONE';
+                advanceFlow(`ขอบคุณครับ คุณ ${val} <br>เพื่อความสะดวกในการติดต่อกลับ ขอทราบ<b>เบอร์โทรศัพท์</b>ด้วยครับ (ข้ามได้ถ้าไม่สะดวก)`);
+            }
+            else if (inputType === 'PHONE' || inputType === 'PHONE_SKIP') {
+                if (inputType === 'PHONE') {
+                    const val = document.getElementById('input-phone').value.trim();
+                    const phoneRegex = /^0[0-9]{8,9}$/;
+                    if (!phoneRegex.test(val)) {
+                        alert("รูปแบบเบอร์โทรไม่ถูกต้อง (ตัวเลข 9-10 หลัก ขึ้นต้นด้วย 0)");
+                        return;
+                    }
+                    formData.phone = val;
+                    addUserMessage(val);
+                } else {
+                    formData.phone = "";
+                    addUserMessage("ไม่ต้องการระบุเบอร์โทร");
+                }
+                state = 'CATEGORY';
+                advanceFlow("โปรดเลือก <b>หมวดหมู่</b> ของเรื่องร้องเรียน/เสนอแนะ จากตัวเลือกด้านล่างครับ");
+            }
+            else if (inputType === 'OTHER_CAT') {
+                const val = document.getElementById('input-other-cat').value.trim();
+                if (!val) return;
+                formData.category = "อื่น ๆ: " + val;
+                addUserMessage(val);
+                state = 'EXTRA_Q';
+                advanceFlow(`รบกวนระบุ วันที่, เวลา หรือสถานที่เกิดเหตุ (ถ้ามี) แบบสั้นๆ ครับ`);
+            }
+            else if (inputType === 'EXTRA_Q' || inputType === 'EXTRA_SKIP') {
+                if (inputType === 'EXTRA_Q') {
+                    const val = document.getElementById('input-extra').value.trim();
+                    if(val) { formData.extraQ = val; addUserMessage(val); }
+                    else { addUserMessage("ข้าม"); }
+                } else {
+                     addUserMessage("ข้ามการระบุข้อมูลเพิ่มเติม");
+                }
+                state = 'DETAILS';
+                advanceFlow("มาถึงส่วนสำคัญครับ <br>โปรดพิมพ์ <b>รายละเอียด</b> ของเรื่องร้องเรียน/เสนอแนะอย่างชัดเจน (20 - 1000 ตัวอักษร)");
+            }
+            else if (inputType === 'DETAILS') {
+                const val = document.getElementById('input-details').value.trim();
+                if (val.length < 20) return;
+                formData.details = val;
+                addUserMessage(val);
+                state = 'IMAGES';
+                advanceFlow("ท่านต้องการ <b>แนบรูปภาพ</b> ประกอบหรือไม่ครับ? (สูงสุด 3 รูป)");
+            }
+            else if (inputType === 'IMAGE_SUBMIT' || inputType === 'IMAGE_SKIP') {
+                if (inputType === 'IMAGE_SUBMIT' && formData.images.length > 0) {
+                    addUserMessage(`แนบรูปภาพ ${formData.images.length} รูป`);
+                } else {
+                    formData.images = [];
+                    addUserMessage("ไม่แนบรูปภาพ");
+                }
+                state = 'CONFIRM';
+                generateSummary();
+            }
+        }
+
+        function advanceFlow(botReplyText) {
+            showTypingIndicator();
+            setTimeout(() => {
+                removeTypingIndicator();
+                addBotMessage(botReplyText, true);
+                renderInputUI(state);
+            }, 600);
+        }
+
+        function generateSummary() {
+            showTypingIndicator();
+            setTimeout(() => {
+                removeTypingIndicator();
+                let summaryHTML = `<b>📝 สรุปข้อมูลก่อนส่ง</b><br><br>
+                    <b>ชื่อ:</b> ${escapeHTML(formData.name)}<br>
+                    <b>เบอร์โทร:</b> ${formData.phone ? escapeHTML(formData.phone) : '<i>ไม่ระบุ</i>'}<br>
+                    <b>หมวดหมู่:</b> ${escapeHTML(formData.category)}<br>
+                    <b>เพิ่มเติม:</b> ${formData.extraQ ? escapeHTML(formData.extraQ) : '-'}<br>
+                    <b>รายละเอียด:</b><br><div class="bg-gray-50 p-2 mt-1 rounded text-xs border border-gray-200">${escapeHTML(formData.details)}</div><br>
+                    <b>รูปภาพ:</b> ${formData.images.length > 0 ? formData.images.length + ' รูป' : 'ไม่มี'}<br><br>
+                    ตรวจสอบข้อมูลให้ถูกต้องแล้วกด <b>"ยืนยันส่งเรื่อง"</b> ด้านล่างครับ`;
+                addBotMessage(summaryHTML, true);
+                renderInputUI(state);
+            }, 800);
+        }
+
+        // --- 3. GOOGLE APPS SCRIPT INTEGRATION (SUBMIT) ---
+        function submitToGoogleSheet() {
+            // Show Loader
+            document.getElementById('loading-overlay').classList.remove('hidden');
+            
+            // Call GAS function
+            if (typeof google !== 'undefined') {
+                google.script.run
+                    .withSuccessHandler(onSuccessSubmit)
+                    .withFailureHandler(onFailSubmit)
+                    .submitComplaint(formData);
+            } else {
+                // Mock test locally
+                setTimeout(() => onSuccessSubmit({success:true, complaintId:'BK-RSI-TEST-0001'}), 2000);
+            }
+        }
+
+        function onSuccessSubmit(response) {
+            document.getElementById('loading-overlay').classList.add('hidden');
+            if (response.success) {
+                state = 'SUCCESS';
+                addUserMessage("ยืนยันส่งข้อมูล");
+                
+                let msg = `✅ <b>ส่งเรื่องร้องเรียนสำเร็จ!</b><br><br>
+                <b>รหัสอ้างอิง:</b> <span class="text-blue-600 font-bold bg-blue-50 px-2 py-1 rounded border">${response.complaintId}</span><br><br>
+                ทางโรงพยาบาลได้รับเรื่องของท่านเรียบร้อยแล้ว และจะนำไปดำเนินการตามขั้นตอนต่อไปครับ<br><br>
+                <b>ช่องทางติดต่อเพิ่มเติม:</b><br>
+                📞 โทร: 042-XXX-XXX<br>
+                ⏰ เวลาทำการ จ.-ศ. 08:30 - 16:30 น.`;
+                
+                addBotMessage(msg, true);
+                renderInputUI(state);
+            } else {
+                onFailSubmit(response.error);
+            }
+        }
+
+        function onFailSubmit(error) {
+            document.getElementById('loading-overlay').classList.add('hidden');
+            alert("เกิดข้อผิดพลาดในการส่งข้อมูล: " + error);
+        }
+
+        // --- 4. ADMIN DASHBOARD LOGIC ---
+        let currentAdminToken = "";
+        let charts = {};
+        let currentComplaintsData = [];
+
+        function toggleView() {
+            const chatView = document.getElementById('chatbot-view');
+            const adminView = document.getElementById('admin-view');
+            const btn = document.getElementById('toggleViewBtn');
+
+            if (adminView.classList.contains('hidden')) {
+                // Go to admin
+                chatView.classList.add('hidden');
+                adminView.classList.remove('hidden');
+                btn.innerHTML = '<i class="fa-solid fa-comments mr-1"></i> กลับหน้าผู้ใช้งาน';
+                document.getElementById('admin-pwd').focus();
+            } else {
+                // Go to chat
+                chatView.classList.remove('hidden');
+                adminView.classList.add('hidden');
+                btn.innerHTML = '<i class="fa-solid fa-lock mr-1"></i> ผู้ดูแลระบบ';
+            }
+        }
+
+        function loginAdmin() {
+            const pwd = document.getElementById('admin-pwd').value;
+            const err = document.getElementById('login-error');
+            err.classList.add('hidden');
+
+            // Show simple loading state on button
+            const btn = document.querySelector('#admin-login-box button');
+            const origText = btn.innerText;
+            btn.innerText = "กำลังตรวจสอบ...";
+            btn.disabled = true;
+
+            if (typeof google !== 'undefined') {
+                google.script.run
+                    .withSuccessHandler((res) => {
+                        btn.innerText = origText;
+                        btn.disabled = false;
+                        if (res.success) {
+                            currentAdminToken = pwd;
+                            document.getElementById('admin-login-box').classList.add('hidden');
+                            document.getElementById('admin-dashboard-box').classList.remove('hidden');
+                            renderDashboard(res.data);
+                        } else {
+                            err.classList.remove('hidden');
+                        }
+                    })
+                    .withFailureHandler(() => {
+                        btn.innerText = origText;
+                        btn.disabled = false;
+                        err.innerText = "การเชื่อมต่อขัดข้อง";
+                        err.classList.remove('hidden');
+                    })
+                    .getDashboardData(pwd);
+            } else {
+                 // Mock
+                 btn.innerText = origText; btn.disabled = false;
+                 if(pwd === '1234') {
+                     document.getElementById('admin-login-box').classList.add('hidden');
+                     document.getElementById('admin-dashboard-box').classList.remove('hidden');
+                 } else { err.classList.remove('hidden'); }
+            }
+        }
+
+        function loadDashboardData() {
+             if (typeof google !== 'undefined' && currentAdminToken) {
+                 const btn = document.querySelector('button[onclick="loadDashboardData()"]');
+                 btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> กำลังโหลด';
+                 google.script.run
+                    .withSuccessHandler((res) => {
+                        btn.innerHTML = '<i class="fa-solid fa-rotate-right mr-1"></i> รีเฟรชข้อมูล';
+                        if (res.success) renderDashboard(res.data);
+                    })
+                    .getDashboardData(currentAdminToken);
+             }
+        }
+
+        function renderDashboard(data) {
+            // Update Stats
+            document.getElementById('stat-total').innerText = data.total;
+            document.getElementById('stat-today').innerText = data.today;
+            document.getElementById('stat-7days').innerText = data.last7Days;
+            document.getElementById('stat-has-phone').innerText = data.hasPhone;
+            document.getElementById('stat-no-phone').innerText = data.noPhone;
+
+            currentComplaintsData = data.allComplaints;
+
+            // Render Keywords Table
+            const kwBody = document.getElementById('keywords-tbody');
+            kwBody.innerHTML = '';
+            data.topKeywords.forEach(kw => {
+                kwBody.innerHTML += `<tr class="border-b"><td class="py-2 px-3">${escapeHTML(kw.word)}</td><td class="py-2 px-3 text-right font-bold text-gray-700">${kw.count}</td></tr>`;
+            });
+
+            // Render Charts
+            renderCharts(data);
+
+            // Render Main Table
+            renderTable();
+        }
+
+        function renderCharts(data) {
+            // Colors
+            const colors = ['#A7C7E7', '#89B4E1', '#FAD4A8', '#B5EAD7', '#FFDAC1', '#FFB7B2', '#E2F0CB', '#C7CEEA', '#FFF2CC', '#F4C2C2', '#ccc'];
+
+            // Bar Chart (Categories)
+            const catLabels = Object.keys(data.categories);
+            const catData = Object.values(data.categories);
+            
+            if(charts.bar) charts.bar.destroy();
+            const ctxBar = document.getElementById('barChart').getContext('2d');
+            charts.bar = new Chart(ctxBar, {
+                type: 'bar',
+                data: {
+                    labels: catLabels.map(l => l.length > 15 ? l.substring(0,15)+'...' : l),
+                    datasets: [{ label: 'จำนวน (เรื่อง)', data: catData, backgroundColor: colors }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+            });
+
+            // Line Chart (Daily trend)
+            // Sort dates
+            const dates = Object.keys(data.dailyTrend).sort();
+            const trendData = dates.map(d => data.dailyTrend[d]);
+
+            if(charts.line) charts.line.destroy();
+            const ctxLine = document.getElementById('lineChart').getContext('2d');
+            charts.line = new Chart(ctxLine, {
+                type: 'line',
+                data: {
+                    labels: dates,
+                    datasets: [{ label: 'จำนวนรับเรื่อง', data: trendData, borderColor: '#6B90B5', backgroundColor: '#A7C7E740', fill: true, tension: 0.3 }]
+                },
+                options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+            });
+        }
+
+        function renderTable() {
+            const tbody = document.getElementById('complaints-tbody');
+            const statusFilter = document.getElementById('filter-status').value;
+            tbody.innerHTML = '';
+
+            let filtered = currentComplaintsData;
+            if (statusFilter !== 'all') {
+                filtered = filtered.filter(item => item.status === statusFilter);
+            }
+            
+            // Limit to top 20 of filtered
+            const displayData = filtered.slice(0, 20);
+
+            if(displayData.length === 0) {
+                 tbody.innerHTML = `<tr><td colspan="5" class="py-4 text-center text-gray-500">ไม่พบข้อมูล</td></tr>`;
+                 return;
+            }
+
+            displayData.forEach(item => {
+                let badge = '';
+                if(item.status === 'new') badge = '<span class="px-2 py-1 bg-red-100 text-red-600 rounded text-xs">รับเรื่องใหม่</span>';
+                else if(item.status === 'in_progress') badge = '<span class="px-2 py-1 bg-yellow-100 text-yellow-700 rounded text-xs">กำลังดำเนินการ</span>';
+                else if(item.status === 'closed') badge = '<span class="px-2 py-1 bg-green-100 text-green-600 rounded text-xs">ปิดงาน</span>';
+
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="py-3 px-4">
+                        <div class="font-medium text-pastel-admin">${item.complaint_id}</div>
+                        <div class="text-xs text-gray-500">${item.timestamp}</div>
+                    </td>
+                    <td class="py-3 px-4 max-w-[150px] truncate" title="${item.category}">${item.category}</td>
+                    <td class="py-3 px-4">${escapeHTML(item.full_name)}</td>
+                    <td class="py-3 px-4">${badge}</td>
+                    <td class="py-3 px-4 text-center">
+                        <button onclick="openModal('${item.complaint_id}')" class="text-pastel-dark hover:text-blue-800 bg-pastel-light px-3 py-1 rounded shadow-sm text-xs">ดู/แก้ไข</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // --- 5. ADMIN MODAL ACTIONS ---
+        let editingId = null;
+
+        function openModal(id) {
+            const item = currentComplaintsData.find(c => c.complaint_id === id);
+            if(!item) return;
+
+            editingId = id;
+            document.getElementById('modal-id').innerText = `รายละเอียด: ${id}`;
+            document.getElementById('m-time').innerText = item.timestamp;
+            document.getElementById('m-cat').innerText = item.category;
+            document.getElementById('m-name').innerText = item.full_name;
+            document.getElementById('m-phone').innerText = item.phone || '-';
+            document.getElementById('m-extra').innerText = item.subcategory_or_tags || '-';
+            document.getElementById('m-details').innerText = item.details;
+            
+            document.getElementById('m-status-input').value = item.status;
+            document.getElementById('m-note-input').value = item.admin_note || '';
+
+            // Handle Images
+            const imgContainer = document.getElementById('m-images-container');
+            const imgDiv = document.getElementById('m-images');
+            imgDiv.innerHTML = '';
+            if (item.images_urls && item.images_urls.trim() !== '') {
+                const urls = item.images_urls.split(' | ');
+                urls.forEach((url, idx) => {
+                    imgDiv.innerHTML += `<a href="${url}" target="_blank" class="border border-pastel-dark rounded p-1 hover:bg-pastel-light text-xs text-blue-600"><i class="fa-solid fa-image"></i> รูปที่ ${idx+1}</a>`;
+                });
+                imgContainer.classList.remove('hidden');
+            } else {
+                imgContainer.classList.add('hidden');
+            }
+
+            document.getElementById('admin-modal').classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('admin-modal').classList.add('hidden');
+            editingId = null;
+        }
+
+        function saveAdminUpdate() {
+            if(!editingId) return;
+            const newStatus = document.getElementById('m-status-input').value;
+            const note = document.getElementById('m-note-input').value;
+            
+            const btn = document.querySelector('#admin-modal button.bg-pastel-admin');
+            const origText = btn.innerText;
+            btn.innerText = "กำลังบันทึก...";
+            btn.disabled = true;
+
+            if (typeof google !== 'undefined') {
+                google.script.run
+                    .withSuccessHandler((res) => {
+                        btn.innerText = origText;
+                        btn.disabled = false;
+                        if(res.success) {
+                            alert('บันทึกเรียบร้อย');
+                            closeModal();
+                            loadDashboardData(); // Refresh
+                        } else {
+                            alert('Error: ' + res.error);
+                        }
+                    })
+                    .withFailureHandler((err) => {
+                        btn.innerText = origText;
+                        btn.disabled = false;
+                        alert('เชื่อมต่อล้มเหลว: ' + err);
+                    })
+                    .updateComplaintStatus(currentAdminToken, editingId, newStatus, note);
+            }
+        }
+    </script>
+</body>
+</html>
