@@ -116,9 +116,14 @@
         <div id="admin-dashboard-box" class="hidden max-w-6xl mx-auto mt-6 p-4 fade-in">
             <div class="flex justify-between items-center mb-6 flex-wrap gap-4">
                 <h2 class="text-2xl font-bold text-gray-800"><i class="fa-solid fa-chart-line mr-2 text-vibrant-admin"></i> สถิติภาพรวม</h2>
-                <button onclick="loadDashboardData()" class="bg-white border-2 border-gray-200 text-gray-700 px-5 py-2.5 rounded-xl hover:bg-gray-50 shadow-sm text-sm font-bold transition">
-                    <i class="fa-solid fa-rotate-right mr-2 text-vibrant-admin"></i> รีเฟรชข้อมูล
-                </button>
+                <div class="flex gap-2">
+                    <button onclick="triggerSetupSheet()" class="bg-white border-2 border-gray-200 text-gray-700 px-5 py-2.5 rounded-xl hover:bg-gray-50 shadow-sm text-sm font-bold transition">
+                        <i class="fa-solid fa-tools mr-2 text-vibrant-admin"></i> Setup Sheet
+                    </button>
+                    <button onclick="loadDashboardData()" class="bg-white border-2 border-gray-200 text-gray-700 px-5 py-2.5 rounded-xl hover:bg-gray-50 shadow-sm text-sm font-bold transition">
+                        <i class="fa-solid fa-rotate-right mr-2 text-vibrant-admin"></i> รีเฟรชข้อมูล
+                    </button>
+                </div>
             </div>
 
             <!-- Stats Cards -->
@@ -407,8 +412,8 @@
                     <div class="flex flex-col gap-3">
                         <textarea id="input-details" rows="3" placeholder="เล่าเหตุการณ์หรือสิ่งที่ต้องการร้องเรียน/เสนอแนะ..." oninput="updateCharCount()" class="w-full border-2 border-gray-200 p-4 rounded-2xl bg-gray-50 focus:ring-4 focus:ring-vibrant-secondary/20 focus:border-vibrant-secondary outline-none text-base resize-none transition"></textarea>
                         <div class="flex justify-between items-center px-2">
-                            <span id="char-count" class="text-sm font-bold text-red-400">0/1000 (ขั้นต่ำ 20 ตัวอักษร)</span>
-                            <button onclick="processInput('DETAILS')" id="btn-details" disabled class="bg-gray-300 text-white px-6 py-2.5 rounded-full text-base font-bold transition shadow-md">ส่งข้อมูล</button>
+                            <span id="char-count" class="text-sm font-bold text-red-400">0/1000 (ขั้นต่ำ 5 ตัวอักษร)</span>
+                            <button onclick="processInput('DETAILS')" id="btn-details" disabled class="bg-gray-300 text-white px-6 py-2.5 rounded-full text-base font-bold transition shadow-md cursor-not-allowed">ส่งข้อมูล</button>
                         </div>
                     </div>`;
                 document.getElementById('input-details').focus();
@@ -457,14 +462,14 @@
             const len = text.length;
             
             countLabel.textContent = `${len}/1000`;
-            if (len >= 20 && len <= 1000) {
+            if (len >= 5 && len <= 1000) {
                 countLabel.className = 'text-sm font-bold text-vibrant-secondary';
                 btn.disabled = false;
                 btn.className = 'bg-vibrant-secondary text-white px-6 py-2.5 rounded-full text-base font-bold transition shadow-lg hover:brightness-90';
             } else {
                 countLabel.className = 'text-sm font-bold text-red-400';
                 btn.disabled = true;
-                btn.className = 'bg-gray-300 text-white px-6 py-2.5 rounded-full text-base font-bold transition shadow-md';
+                btn.className = 'bg-gray-300 text-white px-6 py-2.5 rounded-full text-base font-bold transition shadow-md cursor-not-allowed';
             }
         }
 
@@ -590,7 +595,10 @@
             }
             else if (inputType === 'DETAILS') {
                 const val = document.getElementById('input-details').value.trim();
-                if (val.length < 20) return;
+                if (val.length < 5) {
+                    alert("กรุณาพิมพ์รายละเอียดอย่างน้อย 5 ตัวอักษรครับ");
+                    return;
+                }
                 formData.details = val;
                 addUserMessage(val);
                 state = 'IMAGES';
@@ -640,20 +648,21 @@
             document.getElementById('loading-overlay').classList.remove('hidden');
             
             // Call GAS function
-            if (typeof google !== 'undefined') {
+            if (typeof google !== 'undefined' && google.script && google.script.run) {
                 google.script.run
                     .withSuccessHandler(onSuccessSubmit)
                     .withFailureHandler(onFailSubmit)
                     .submitComplaint(formData);
             } else {
                 // Mock test locally
+                console.log("Mocking submission to avoid error outside GAS environment...");
                 setTimeout(() => onSuccessSubmit({success:true, complaintId:'BK-RSI-TEST-0001'}), 2000);
             }
         }
 
         function onSuccessSubmit(response) {
             document.getElementById('loading-overlay').classList.add('hidden');
-            if (response.success) {
+            if (response && response.success) {
                 state = 'SUCCESS';
                 addUserMessage("ยืนยันส่งข้อมูล");
                 
@@ -753,6 +762,37 @@
                     })
                     .getDashboardData(currentAdminToken);
              }
+        }
+
+        // เพิ่มฟังก์ชันสำหรับเรียก Setup Sheet จาก Admin Dashboard
+        function triggerSetupSheet() {
+            if (confirm("ต้องการสั่งให้ระบบสร้าง/ตรวจสอบคอลัมน์ Sheet และโฟลเดอร์สำหรับรับเรื่องร้องเรียนใช่หรือไม่?")) {
+                const btn = document.querySelector('button[onclick="triggerSetupSheet()"]');
+                const origText = btn.innerHTML;
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2 text-vibrant-admin"></i> กำลังตั้งค่า...';
+                btn.disabled = true;
+
+                if (typeof google !== 'undefined' && google.script && google.script.run) {
+                    google.script.run
+                        .withSuccessHandler(() => {
+                            btn.innerHTML = origText;
+                            btn.disabled = false;
+                            alert('ดำเนินการตั้งค่าคอลัมน์และโฟลเดอร์เรียบร้อยแล้ว!');
+                        })
+                        .withFailureHandler((err) => {
+                            btn.innerHTML = origText;
+                            btn.disabled = false;
+                            alert('เกิดข้อผิดพลาด: ' + err);
+                        })
+                        .setupSystem();
+                } else {
+                    setTimeout(() => {
+                        btn.innerHTML = origText;
+                        btn.disabled = false;
+                        alert("จำลองการตั้งค่า Setup Sheet สำเร็จ (Mock)");
+                    }, 1000);
+                }
+            }
         }
 
         function renderDashboard(data) {
